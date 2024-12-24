@@ -1,0 +1,267 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Falling Balls</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: linear-gradient(to bottom, #87CEEB, #f0f8ff);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      flex-direction: column;
+    }
+
+    #play-button {
+      padding: 20px 40px;
+      font-size: 24px;
+      font-family: Arial, sans-serif;
+      font-weight: bold;
+      color: white;
+      background-color: #FF4500;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .model-button {
+      padding: 10px 20px;
+      font-size: 18px;
+      margin: 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      background-color: #4CAF50;
+      color: white;
+    }
+
+    #score {
+      font-size: 24px;
+      font-family: Arial, sans-serif;
+      font-weight: bold;
+      color: #FF4500;
+      margin-bottom: 20px;
+    }
+
+    .ball {
+      position: absolute;
+      width: 50px;
+      height: 50px;
+      background-color: #FF4500;
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-size: 24px;
+      font-family: Arial, sans-serif;
+      font-weight: bold;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      cursor: pointer;
+    }
+
+    @keyframes explode {
+      0% {
+        transform: scale(1);
+        opacity: 1;
+      }
+      100% {
+        transform: scale(2);
+        opacity: 0;
+      }
+    }
+
+    #container {
+      display: none;
+      position: fixed;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+    #delete-line {
+      display: none;
+      position: fixed;
+      bottom: 405px;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background-color: red;
+      z-index: 10;
+    }
+    #prediction {
+      position: absolute;
+      top: 130px;
+      right: -150px;
+    }
+    #canvas {
+      border: 1px solid #000;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Buttons for CNN and FCN -->
+<button id="cnn-button" class="model-button" style="display: inline-block;">CNN</button>
+<button id="fcn-button" class="model-button">FCN</button>
+
+<!-- Play Button -->
+<button id="play-button">Play</button>
+
+<div id="delete-line"></div>
+<div id="container">
+  <canvas id="canvas" width="280" height="280"></canvas>
+  <h2 id="prediction"></h2>
+</div>
+
+<script>
+  const speed = 0.3;
+  let gameInterval;
+  let score = 0;
+  let prediction = null;
+  let selectedModel = ''; // Variable to store the selected model
+
+  function updateScore(points) {
+    score += points;
+    document.getElementById('score').textContent = `Score: ${score}`;
+  }
+
+  const deleteLineY = window.innerHeight - 405;
+
+  function createBall() {
+    const ball = document.createElement('div');
+    ball.className = 'ball';
+    ball.textContent = Math.floor(Math.random() * 10);
+
+    ball.style.left = Math.random() * window.innerWidth + 'px';
+    ball.style.top = '-50px';
+
+    ball.addEventListener('click', () => {
+      ball.style.animation = 'explode 0.5s forwards';
+      updateScore(1);
+      setTimeout(() => ball.remove(), 500);
+    });
+
+    document.body.appendChild(ball);
+
+    let position = -50;
+    const interval = setInterval(() => {
+      position += speed;
+      ball.style.top = position + 'px';
+
+      if (prediction !== null && ball.textContent === prediction) {
+        ball.click();
+      }
+
+      if (position > deleteLineY) {
+        clearInterval(interval);
+        ball.remove();
+      }
+    }, 16);
+  }
+
+  // Handle Play button logic
+  document.getElementById('play-button').addEventListener('click', () => {
+    if (!selectedModel) {
+      alert('Please select a model (CNN or FCN) before playing.');
+      return;
+    }
+    document.getElementById('play-button').style.display = 'none';
+    document.getElementById('container').style.display = 'block';
+    document.getElementById('delete-line').style.display = 'block';
+    document.getElementById('cnn-button').style.display = "none";
+    document.getElementById('fcn-button').style.display = "none";
+    gameInterval = setInterval(createBall, 3000);
+  });
+
+  // Model selection buttons (CNN and FCN)
+  document.getElementById('cnn-button').addEventListener('click', () => {
+    selectedModel = 'CNN';
+    document.getElementById('cnn-button').style.background = "black";
+    document.getElementById('fcn-button').style.background = "#4CAF50";
+  });
+
+  document.getElementById('fcn-button').addEventListener('click', () => {
+    selectedModel = 'FCN';
+    document.getElementById('fcn-button').style.background = "black";
+    document.getElementById('cnn-button').style.background = "#4CAF50";
+  });
+
+  let canvas = document.getElementById("canvas");
+  let ctx = canvas.getContext("2d");
+
+  ctx.lineWidth = 15;
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "#000000";
+
+  let drawing = false;
+
+  canvas.addEventListener("mousedown", (e) => {
+    drawing = true;
+    ctx.beginPath();
+    ctx.moveTo(e.offsetX, e.offsetY);
+  });
+
+  canvas.addEventListener("mousemove", (e) => {
+    if (drawing) {
+      ctx.lineTo(e.offsetX, e.offsetY);
+      ctx.stroke();
+    }
+  });
+
+  canvas.addEventListener("mouseup", () => {
+    drawing = false;
+  });
+
+  function clearCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    document.getElementById("prediction").innerText = "";
+    prediction = null;
+  }
+
+  function submitCanvas() {
+    let tempCanvas = document.createElement("canvas");
+    let tempCtx = tempCanvas.getContext("2d");
+
+    tempCanvas.width = 28;
+    tempCanvas.height = 28;
+    tempCtx.drawImage(canvas, 0, 0, 28, 28);
+
+    const imageData = tempCanvas.toDataURL("image/png");
+
+    const apiEndpoint = selectedModel === 'CNN' ? 'http://localhost:5000/predict2' : 'http://localhost:5000/predict';
+
+    fetch(apiEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ image: imageData })
+    })
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById("prediction").innerText = `Prediction: ${data.prediction}`;
+        prediction = data.prediction;
+      })
+      .catch(error => console.error("Error:", error));
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      submitCanvas();
+      clearCanvas();
+    }
+  });
+</script>
+
+</body>
+</html>
